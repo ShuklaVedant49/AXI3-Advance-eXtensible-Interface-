@@ -1,23 +1,78 @@
-module AXI3_design (
+module AXI3_design(
   
   input clk,
   input resetn,
   
   //Master will initiatie this transfer//
-  //Declaring Write data channel signal//
   
-  input awvalid; 	     //1-bit signal for Valid Indicator
-  input [31:0] awaddr; //Address width of 32 bit.
-  input [3:0] awID;	   //Provides uniwue ID for each and every Transaction
-  input [3:0] awlen;   //Deciding Length for the bus which is 16-bit
-  					           //This will represent we are using AXI3
-  input [2:0] awsize;  //Unique Transaction size
-  input [1:0] awburst; //Total 3 types of burst is provided.				
+  //******* Write Channel*****/////
+  //Write Request channel signal (AW)//
+  input awvalid, 	   //1-bit signal for Valid Indicator
+  input [31:0] awaddr, //Address width of 32 bit.
+  input [3:0] awID,	   //Provides unique ID for each and every Transaction
+  input [3:0] awlen,   //Deciding Length for the bus which is 16-bit
+  					   //This will represent we are using AXI3
+  input [2:0] awsize,  //Unique Transaction size
+  input [1:0] awburst, //Total 3 types of burst is provided.				
   //Fixed, INCR WRAP THESE tyes of Bursts are availabe.
   //Also if you want to go for AXI4 we can use the size of awlen [256]
-  output awready; 	   //These will be initiated by Slave	
+  output awready, 	   //These will be initiated by Slave	
   
-  //Making Write DATA Channel///////////
+  //Write DATA Channel (W)///////////
+  //This channel will carry write data from master to slave
+  input wvalid,  			//master sending new address to slave
+  output reg wready,  		//slave ready to accept the data
+  input [31:0] wdata,		//Actual data should be written 
+  input [3:0] wstrb,		//Strobe tells which lane of the signal is active
+  							//also tell which has correct data
+  input wlast,				//last sigal which tells transaction is complete
+  
+  //Write Response Channel (B)/////////
+  input bready,			    //Master is ready to take the reposne	
+  output reg bvalid,		//slave valid resposne
+  output reg [3:0] bid,		//Unique ID for transaction
+  output reg [1:0] bresp,	//Status of write transfer
+  
+  
+  //*****Read Channel*****//////////
+  //Read Address Channel (ar)///////
+  input arvalid,			//Master wants to read the data
+  output reg arready,		//Slave ready to sent data if bit is high
+  input  [31:0] araddr,		//Address for the location to write
+  input [3:0] arid,			//Unique ID
+  input [3:0] arlen,		//length of the burst
+  input [2:0] arsize,		//Number of bytes transfer
+  input [1:0] arburst,
+  
+  //Read Data Channel (R)/////
+  //This bus will have data and that will be readed by Master through the read
+  //data bus.
+  output reg [3:0] rid,
+  output reg [31:0] rdata,
+  output reg [1:0] rresp,
+  output reg rlast,
+  output reg rvalid,
+  input rready
 );
-
+  
+  //Total 3 state for thr AW channel (Write Data Channel)/////////
+  typedef enum bit [1:0] {awidle=2'b00; awstart=2'b01; awreadys=2'b10} awstate_type;
+  awstate_type awstate, awnext_state;
+  
+  //Decaring logic if reset is high or Low
+  always_ff (posedge clk, negedge resetn)
+    begin
+      if(!resetn)begin
+        awstate <= awidle;  	//Write Request channel will go to Idle state
+        wstate  <= widle;		//write data channel IDLE
+        bstate  <= bdile;		//Write resposne channel IDLE
+      end
+      else
+        begin
+          awstate <= awnext_state;  //If not reset will go into the enxt state
+          wstate  <= wnext_state;
+          bstate  <= bnext_state;
+        end
+    end
+  
 endmodule
