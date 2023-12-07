@@ -7,18 +7,18 @@ module AXI3_design(
   
   //******* Write Channel*****/////
   //Write Request channel signal (AW)//
-  input awvalid, 	   //1-bit signal for Valid Indicator
-  input [31:0] awaddr, //Address width of 32 bit.
-  input [3:0] awID,	   //Provides unique ID for each and every Transaction
-  input [3:0] awlen,   //Deciding Length for the bus which is 16-bit
-  					   //This will represent we are using AXI3
-  input [2:0] awsize,  //Unique Transaction size
-  input [1:0] awburst, //Total 3 types of burst is provided.				
-  //Fixed, INCR WRAP THESE tyes of Bursts are availabe.
-  //Also if you want to go for AXI4 we can use the size of awlen [256]
-  output awready, 	   //These will be initiated by Slave	
+  input        awvalid,     //1-bit signal for Valid Indicator
+  input [31:0] awaddr,     //Address width of 32 bit.
+  input [3:0]  awID,	   //Provides unique ID for each and every Transaction
+  input [3:0]  awlen,      //Deciding Length for the bus which is 16-bit
+  					       //This will represent we are using AXI3
+  input [2:0]  awsize,     //Unique Transaction size
+  input [1:0]  awburst,    //Total 3 types of burst is provided.				
+ 					       //Fixed, INCR WRAP THESE tyes of Bursts are availabe.
+  					       //Also if you want to go for AXI4 we can use the size of awlen [256]
+  output awready, 	       //These will be initiated by Slave	
   
-  //Write DATA Channel (W)///////////
+  //*******Write DATA Channel (W)**********/
   //This channel will carry write data from master to slave
   input wvalid,  			//master sending new address to slave
   output reg wready,  		//slave ready to accept the data
@@ -27,7 +27,7 @@ module AXI3_design(
   							//also tell which has correct data
   input wlast,				//last sigal which tells transaction is complete
   
-  //Write Response Channel (B)/////////
+  //********Write Response Channel (B)*********//
   input bready,			    //Master is ready to take the reposne	
   output reg bvalid,		//slave valid resposne
   output reg [3:0] bid,		//Unique ID for transaction
@@ -60,6 +60,7 @@ module AXI3_design(
   awstate_type awstate, awnext_state;
   
   //Decaring logic if reset is high or Low
+  //******RESET DECODER ****************
   always_ff (posedge clk, negedge resetn)
     begin
       if(!resetn)begin
@@ -69,10 +70,50 @@ module AXI3_design(
       end
       else
         begin
-          awstate <= awnext_state;  //If not reset will go into the enxt state
+          awstate <= awnext_state;  //If not reset will go into the next state
           wstate  <= wnext_state;
           bstate  <= bnext_state;
         end
     end
+  
+  //3 FSM ARE REQUIRED EACH for 3 write channel
+  //******[1] Write Address Channel **********//
+  always_comb
+    begin
+      case(awstate)
+        awidle:      //awready signal will be zero.
+          begin
+            awvalid      = 1'b0;
+            awnext_state = awstart;
+          end
+        
+        //** Make sure to sense the signal awvalid once it is detected send awready signal**//
+        //WAIT FOR user to make awvalid high.
+        awstart:
+          begin
+            if(awvalid)
+              begin
+                awnext_state = awreadys;
+                awaddrt      = awaddr;     //Storing address In temorary variable
+              end
+            else 
+              begin
+                awnext_state = awstart;		//Remains in same state if AWVALID is low
+              end
+          end
+              
+        //**awvalid becomes HIGH make sure awready also become high if awready is not high
+        //move to IDLE state load the address and make the awready HIGH.
+        awreadys:
+          begin
+            awready =1'b1;
+            if(wstate == wreadys)
+              awnext_state = awidle;
+            else
+              awnext_state = awreadys;
+          end
+      endcase
+    end
+  
   
 endmodule
